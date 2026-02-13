@@ -24,7 +24,7 @@ const data = [
   { label: 'Option 3', value: '3' },
 ];
 
-export default function AddTransaction({ onClose, onSave }) {
+export default function AddTransaction({ onClose, onSave }: { onClose: () => void; onSave: (transaction: any) => void }) {
   const [category, setCategory] = useState("Food");
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
@@ -38,8 +38,8 @@ export default function AddTransaction({ onClose, onSave }) {
       quality: 0.7,
     });
 
-    if (!result.cancelled) {
-      setReceipt(result.uri);
+    if (!result.canceled && result.assets && result.assets.length > 0) {
+      setReceipt(result.assets[0].uri);
     }
   };
 

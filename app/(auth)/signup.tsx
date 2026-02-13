@@ -11,24 +11,29 @@ import {
   Alert,
   TouchableOpacity,
 } from "react-native";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router, useNavigation } from "expo-router";
 // import { useAuth } from "@/context/AuthContext";
-
 type Student = {
   id: string;
   name?: string;
   email?: string;
-  status?: string;
   password?: string;
-  nic?: string;
-  otpExpiry?: { toDate: () => Date };
 };
 
+const API_URL =
+  Platform.OS === "android"
+    ? "http://10.0.2.2:8080/backend/api/users"
+    : "http://192.168.8.115:8080/backend/api/users";
+
+
 const SignUpScreen = () => {
-  const [name, setName] = useState("");
+  const navigation = useNavigation();
+
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -36,61 +41,64 @@ const SignUpScreen = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  const [nameFocused, setNameFocused] = useState(false);
+  const [firstNameFocused, setFirstNameFocused] = useState(false);
+  const [lastNameFocused, setLastNameFocused] = useState(false);
   const [emailFocused, setEmailFocused] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
   const [confirmPasswordFocused, setConfirmPasswordFocused] = useState(false);
 
-  //   const navigation = useNavigation();
-  //   const { setUser } = useAuth();
+  const registerUser = async () => {
+    if (!firstName || !lastName || !email || !password || !confirmPassword) {
+      Alert.alert("Error", "Please fill all fields");
+      return;
+    }
 
-  //   const handleLogin = async () => {
-  //     if (!email || !password) {
-  //       Alert.alert("Missing Fields", "Please enter email and password/OTP.");
-  //       return;
-  //     }
+    if (password !== confirmPassword) {
+      Alert.alert("Error", "Passwords do not match");
+      return;
+    }
 
-  //     try {
-  //       const q = query(collection(db, "students"), where("email", "==", email));
-  //       const snapshot = await getDocs(q);
+    try {
+      const response = await fetch(API_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({
+          firstName,
+          lastName,
+          email,
+          password,
+        }),
+      });
 
-  //       if (snapshot.empty) {
-  //         Alert.alert("Login Failed", "Student not found.");
-  //         return;
-  //       }
+      const text = await response.text();
+      console.log("Server raw response:", text);
 
-  //       const docData = snapshot.docs[0];
-  //       const student: Student = { id: docData.id, ...docData.data() };
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (err) {
+        console.error("Response is not JSON:", err);
+        Alert.alert(
+          "Error",
+          "Server returned unexpected response. Check console."
+        );
+        return;
+      }
 
-  //       if (student.status === "Deactive") {
-  //         Alert.alert("Account Deactivated", "Please contact administration.");
-  //         return;
-  //       }
-
-  //       if (student.password) {
-  //         if (student.password === password) {
-  //           Alert.alert("Login Successful", `Welcome ${student.name}`);
-  //           setUser(student);
-  //           router.replace("/(tabs)");
-  //         } else {
-  //           Alert.alert("Incorrect Password", "Please try again.");
-  //         }
-  //       } else {
-  //         const otpExpiry = student.otpExpiry?.toDate();
-  //         const now = new Date();
-  //         if (password === student.nic && otpExpiry && now < otpExpiry) {
-  //           Alert.alert("OTP Login Successful", `Welcome ${student.name}`);
-  //           setUser(student);
-  //           router.replace("/(tabs)");
-  //         } else {
-  //           Alert.alert("Invalid OTP", "OTP is incorrect or expired.");
-  //         }
-  //       }
-  //     } catch (error) {
-  //       console.error("Login error:", error);
-  //       Alert.alert("Error", "Something went wrong during login.");
-  //     }
-  //   };
+      if (response.ok && data.status) {
+        Alert.alert("Success", data.message);
+        navigation.navigate("/(auth)");
+      } else {
+        Alert.alert("Error", data.message || "Failed to register");
+      }
+    } catch (error) {
+      console.error("Fetch error:", error);
+      Alert.alert("Error", "Cannot reach server. Check console for details.");
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -108,11 +116,11 @@ const SignUpScreen = () => {
           </Text>
 
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>Name</Text>
+            <Text style={styles.label}>First Name</Text>
             <View
               style={[
                 styles.emailInputWrapper,
-                nameFocused && styles.focusedInput,
+                firstNameFocused && styles.focusedInput,
               ]}
             >
               <MaterialCommunityIcons
@@ -122,12 +130,37 @@ const SignUpScreen = () => {
               />
               <TextInput
                 style={styles.textInput}
-                placeholder="Enter your name"
+                placeholder="Enter your first name"
                 placeholderTextColor="grey"
-                value={name}
-                onChangeText={setName}
-                onFocus={() => setNameFocused(true)}
-                onBlur={() => setNameFocused(false)}
+                value={firstName}
+                onChangeText={setFirstName}
+                onFocus={() => setFirstNameFocused(true)}
+                onBlur={() => setFirstNameFocused(false)}
+              />
+            </View>
+          </View>
+
+          <View style={styles.inputContainer}>
+            <Text style={styles.label}>Last Name</Text>
+            <View
+              style={[
+                styles.emailInputWrapper,
+                lastNameFocused && styles.focusedInput,
+              ]}
+            >
+              <MaterialCommunityIcons
+                name="account-outline"
+                size={20}
+                color="#d3d3d3"
+              />
+              <TextInput
+                style={styles.textInput}
+                placeholder="Enter your last name"
+                placeholderTextColor="grey"
+                value={lastName}
+                onChangeText={setLastName}
+                onFocus={() => setLastNameFocused(true)}
+                onBlur={() => setLastNameFocused(false)}
               />
             </View>
           </View>
@@ -143,16 +176,17 @@ const SignUpScreen = () => {
               <MaterialCommunityIcons
                 name="email-outline"
                 size={20}
-                color={"#d3d3d3"}
+                color="#d3d3d3"
               />
               <TextInput
                 style={styles.textInput}
                 placeholder="Enter your email"
-                placeholderTextColor={"grey"}
-                onFocus={() => setEmailFocused(true)}
-                onBlur={() => setEmailFocused(false)}
+                placeholderTextColor="grey"
                 value={email}
                 onChangeText={setEmail}
+                onFocus={() => setEmailFocused(true)}
+                onBlur={() => setEmailFocused(false)}
+                keyboardType="email-address"
               />
             </View>
           </View>
@@ -170,7 +204,6 @@ const SignUpScreen = () => {
                 size={20}
                 color="#d3d3d3"
               />
-
               <TextInput
                 style={styles.textInput}
                 placeholder="Enter password"
@@ -181,7 +214,6 @@ const SignUpScreen = () => {
                 onFocus={() => setPasswordFocused(true)}
                 onBlur={() => setPasswordFocused(false)}
               />
-
               <Pressable onPress={() => setShowPassword(!showPassword)}>
                 <MaterialCommunityIcons
                   name={showPassword ? "eye-off-outline" : "eye-outline"}
@@ -205,7 +237,6 @@ const SignUpScreen = () => {
                 size={20}
                 color="#d3d3d3"
               />
-
               <TextInput
                 style={styles.textInput}
                 placeholder="Re-enter password"
@@ -216,12 +247,15 @@ const SignUpScreen = () => {
                 onFocus={() => setConfirmPasswordFocused(true)}
                 onBlur={() => setConfirmPasswordFocused(false)}
               />
-
               <Pressable
-                onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                onPress={() =>
+                  setShowConfirmPassword(!showConfirmPassword)
+                }
               >
                 <MaterialCommunityIcons
-                  name={showConfirmPassword ? "eye-off-outline" : "eye-outline"}
+                  name={
+                    showConfirmPassword ? "eye-off-outline" : "eye-outline"
+                  }
                   size={22}
                   color="#636363"
                 />
@@ -229,9 +263,13 @@ const SignUpScreen = () => {
             </View>
           </View>
 
-          <TouchableOpacity style={styles.loginButton}>
+          <TouchableOpacity
+            style={styles.loginButton}
+            onPress={registerUser}
+          >
             <Text style={styles.loginButtonText}>Sign Up</Text>
           </TouchableOpacity>
+
           <View
             style={{
               flexDirection: "row",
@@ -239,10 +277,8 @@ const SignUpScreen = () => {
               marginTop: 16,
             }}
           >
-            <Text style={styles.footerText}>
-                Already have an account ?{"    "}
-            </Text>
-            <Pressable onPress={() => router.push("/(auth)/login")}>
+            <Text style={styles.footerText}>Already have an account? </Text>
+            <Pressable onPress={() => router.push("/(auth)")}>
               <Text style={styles.signUpText}>Sign In</Text>
             </Pressable>
           </View>
@@ -255,6 +291,7 @@ const SignUpScreen = () => {
     </SafeAreaView>
   );
 };
+;
 
 export default SignUpScreen;
 

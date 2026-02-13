@@ -1,7 +1,9 @@
 import AddTransaction from "@/components/AddTransaction";
 import ExpenseItem from "@/components/ExpenseItem";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { LinearGradient } from "expo-linear-gradient";
+import { router } from "expo-router";
 import React, { useState } from "react";
 import {
   View,
@@ -11,6 +13,7 @@ import {
   FlatList,
   TouchableOpacity,
   Modal,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Icon } from "react-native-screens";
@@ -68,6 +71,18 @@ export default function Home() {
     console.log("Saved Transaction:", transaction);
   };
 
+    const handleLogout = async () => {
+    try {
+      await AsyncStorage.removeItem("user"); // Remove stored user
+      Alert.alert("Logged out", "You have been logged out successfully!");
+      router.replace("/(auth)"); // Redirect to login screen
+    } catch (err) {
+      console.error("Error logging out:", err);
+      Alert.alert("Error", "Something went wrong. Try again.");
+    }
+  };
+  
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -76,9 +91,9 @@ export default function Home() {
           <Text style={styles.name}>Vinudhi Wahalathanthri</Text>
         </View>
 
-        <View style={styles.searchButton}>
+        <Pressable style={styles.searchButton} onPress={handleLogout}>
           <Ionicons name="search" size={20} color="#000" />
-        </View>
+        </Pressable>
       </View>
 
       <LinearGradient colors={["#ffffff", "#e6f6ea"]} style={styles.card}>

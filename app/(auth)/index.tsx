@@ -11,21 +11,27 @@ import {
   Alert,
   TouchableOpacity,
 } from "react-native";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router, useNavigation } from "expo-router";
-// import { useAuth } from "@/context/AuthContext";
+import {
+  closeConnection,
+  connectWebSocket,
+} from "../../service/socketServices";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 type Student = {
   id: string;
   name?: string;
   email?: string;
-  status?: string;
   password?: string;
-  nic?: string;
-  otpExpiry?: { toDate: () => Date };
 };
+
+const API_URL =
+  Platform.OS === "android"
+    ? "http://10.0.2.2:8080/backend/api/users/login"
+    : "http://192.168.8.115:8080/backend/api/users/login";
 
 const LoginScreen = () => {
   const [email, setEmail] = useState("");
@@ -33,64 +39,47 @@ const LoginScreen = () => {
   const [emailFocused, setEmailFocused] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
 
+  useEffect(() => {
+    const checkLogin = async () => {
+      try {
+        const userData = await AsyncStorage.getItem("user");
+        if (userData) {
+          router.replace("/(tabs)/home");
+        }
+      } catch (err) {
+        console.error("Error reading AsyncStorage:", err);
+      }
+    };
+    checkLogin();
+  }, []);
 
-  const navigation = useNavigation();
+  const handleLogin = async () => {
+    if (!email || !password) {
+      Alert.alert("Error", "Please fill all fields");
+      return;
+    }
 
-  const handleLogin = () =>{
-    navigation.navigate("(tabs)")
-  }
+    try {
+      const response = await fetch(API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
 
-  //   const navigation = useNavigation();
-  //   const { setUser } = useAuth();
+      const data = await response.json();
 
-  //   const handleLogin = async () => {
-  //     if (!email || !password) {
-  //       Alert.alert("Missing Fields", "Please enter email and password/OTP.");
-  //       return;
-  //     }
-
-  //     try {
-  //       const q = query(collection(db, "students"), where("email", "==", email));
-  //       const snapshot = await getDocs(q);
-
-  //       if (snapshot.empty) {
-  //         Alert.alert("Login Failed", "Student not found.");
-  //         return;
-  //       }
-
-  //       const docData = snapshot.docs[0];
-  //       const student: Student = { id: docData.id, ...docData.data() };
-
-  //       if (student.status === "Deactive") {
-  //         Alert.alert("Account Deactivated", "Please contact administration.");
-  //         return;
-  //       }
-
-  //       if (student.password) {
-  //         if (student.password === password) {
-  //           Alert.alert("Login Successful", `Welcome ${student.name}`);
-  //           setUser(student);
-  //           router.replace("/(tabs)");
-  //         } else {
-  //           Alert.alert("Incorrect Password", "Please try again.");
-  //         }
-  //       } else {
-  //         const otpExpiry = student.otpExpiry?.toDate();
-  //         const now = new Date();
-  //         if (password === student.nic && otpExpiry && now < otpExpiry) {
-  //           Alert.alert("OTP Login Successful", `Welcome ${student.name}`);
-  //           setUser(student);
-  //           router.replace("/(tabs)");
-  //         } else {
-  //           Alert.alert("Invalid OTP", "OTP is incorrect or expired.");
-  //         }
-  //       }
-  //     } catch (error) {
-  //       console.error("Login error:", error);
-  //       Alert.alert("Error", "Something went wrong during login.");
-  //     }
-  //   };
-
+      if (response.ok && data.status) {
+        await AsyncStorage.setItem("user", JSON.stringify({ email }));
+        Alert.alert("Success", "Logged in successfully!");
+        router.replace("/(tabs)/home");
+      } else {
+        Alert.alert("Error", data.message || "Login failed");
+      }
+    } catch (error) {
+      console.error(error);
+      Alert.alert("Error", "Cannot connect to server");
+    }
+  };
   return (
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView
@@ -107,6 +96,7 @@ const LoginScreen = () => {
           </Text>
           <Text style={styles.subTitle}>Login to track all your expenses</Text>
 
+          {/* Email */}
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Email</Text>
             <View
@@ -128,10 +118,13 @@ const LoginScreen = () => {
                 onBlur={() => setEmailFocused(false)}
                 value={email}
                 onChangeText={setEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
               />
             </View>
           </View>
 
+          {/* Password */}
           <View style={styles.passwordContainer}>
             <Text style={styles.label}>Password</Text>
             <View
@@ -154,13 +147,20 @@ const LoginScreen = () => {
                 onBlur={() => setPasswordFocused(false)}
                 value={password}
                 onChangeText={setPassword}
+                autoCapitalize="none"
               />
             </View>
           </View>
 
-          <TouchableOpacity style={styles.loginButton} onPress={handleLogin}>
+          {/* Login Button */}
+          <TouchableOpacity
+            style={styles.loginButton}
+            onPress={handleLogin} // Correct function call
+          >
             <Text style={styles.loginButtonText}>Login</Text>
           </TouchableOpacity>
+
+          {/* Sign Up link */}
           <View
             style={{
               flexDirection: "row",
@@ -168,9 +168,7 @@ const LoginScreen = () => {
               marginTop: 16,
             }}
           >
-            <Text style={styles.footerText}>
-              Don't have an account ?{"    "}
-            </Text>
+            <Text style={styles.footerText}>Don't have an account? </Text>
             <Pressable onPress={() => router.push("/(auth)/signup")}>
               <Text style={styles.signUpText}>Sign Up</Text>
             </Pressable>
