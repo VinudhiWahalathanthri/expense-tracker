@@ -16,41 +16,39 @@ import { Ionicons } from "@expo/vector-icons";
 import DropDownPicker from "react-native-dropdown-picker";
 
 type Transaction = {
+  id: number;
   category: string;
   amount: string;
-  title:string;
+  title: string;
   description: string;
   date: Date;
   type: "income" | "expense";
   wallet: string;
 };
 
-type AddTransactionProps = {
+type EditTransactionProps = {
+  transaction: Transaction;
   onClose: () => void;
-  onSave: (transaction: Transaction) => void;
+  onUpdate: (transaction: Transaction) => void;
+  onDelete: (id: number) => void;
 };
 
-export default function AddTransaction({
+export default function EditTransaction({
+  transaction,
   onClose,
-  onSave,
-}: AddTransactionProps) {
-  // Form state
-  const [selectedType, setSelectedType] = useState<"income" | "expense">(
-    "expense",
-  );
-  const [category, setCategory] = useState<string | null>(null);
-  const [wallet, setWallet] = useState<string | null>(null);
-  const [amount, setAmount] = useState("");
-  const [description, setDescription] = useState("");
-  const [title, setTitle] = useState("");
-  const [date, setDate] = useState(new Date());
+}: EditTransactionProps) {
+  const [selectedType, setSelectedType] = useState(transaction.type);
+  const [category, setCategory] = useState<string | null>(transaction.category);
+  const [wallet, setWallet] = useState<string | null>(transaction.wallet);
+  const [amount, setAmount] = useState(transaction.amount);
+  const [title, setTitle] = useState(transaction.title);
+  const [description, setDescription] = useState(transaction.description);
+  const [date, setDate] = useState(new Date(transaction.date));
   const [showDatePicker, setShowDatePicker] = useState(false);
 
-  // Dropdown states
   const [categoryOpen, setCategoryOpen] = useState(false);
   const [walletOpen, setWalletOpen] = useState(false);
 
-  // Dropdown items
   const [categoryItems, setCategoryItems] = useState([
     {
       label: "Food & Dining",
@@ -114,7 +112,7 @@ export default function AddTransaction({
     },
   ]);
 
-  const handleSave = () => {
+  const handleUpdate = async () => {
     if (!amount || !category || !wallet) {
       Alert.alert("Missing Fields", "Please fill in all required fields.");
       return;
@@ -125,18 +123,49 @@ export default function AddTransaction({
       return;
     }
 
-    const transaction: Transaction = {
+    const updatedTransaction: Transaction = {
+      ...transaction,
       category,
+      wallet,
       amount,
+      title,
       description,
       date,
       type: selectedType,
-      wallet,
-      title: ""
     };
 
-    onSave(transaction);
-    onClose();
+    try {
+      console.log("Updated Transaction:", updatedTransaction);
+
+      Alert.alert("Success", "Transaction updated successfully!");
+      onClose();
+    } catch (error) {
+      Alert.alert("Error", "Failed to update transaction.");
+    }
+  };
+
+  const handleDelete = () => {
+    Alert.alert(
+      "Delete Transaction",
+      "Are you sure you want to delete this transaction?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              console.log("Deleted Transaction ID:", transaction.id);
+
+              Alert.alert("Deleted", "Transaction deleted successfully.");
+              onClose();
+            } catch (error) {
+              Alert.alert("Error", "Failed to delete transaction.");
+            }
+          },
+        },
+      ],
+    );
   };
 
   return (
@@ -151,15 +180,20 @@ export default function AddTransaction({
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.container}>
-          {/* Header */}
           <View style={styles.header}>
-            <Text style={styles.title}>Add New Transaction</Text>
-            <Pressable onPress={onClose} style={styles.closeIcon}>
-              <Ionicons name="close" size={24} color="#fff" />
-            </Pressable>
+            <Text style={styles.title}>Edit Transaction</Text>
+
+            <View style={{ flexDirection: "row", gap: 16 }}>
+              <Pressable onPress={handleDelete}>
+                <Ionicons name="trash-outline" size={22} color="#ef4444" />
+              </Pressable>
+
+              <Pressable onPress={onClose}>
+                <Ionicons name="close" size={24} color="#fff" />
+              </Pressable>
+            </View>
           </View>
 
-          {/* Type Selector */}
           <View style={styles.typeSelector}>
             <Pressable
               style={[
@@ -250,7 +284,9 @@ export default function AddTransaction({
             />
           </View>
 
-          <Text style={[styles.label, { marginTop: walletOpen ? 180 : 16 }]}>Title</Text>
+          <Text style={[styles.label, { marginTop: walletOpen ? 180 : 16 }]}>
+            Title
+          </Text>
           <TextInput
             style={[styles.input]}
             placeholder="Add notes (optional)"
@@ -262,7 +298,9 @@ export default function AddTransaction({
             textAlignVertical="top"
           />
 
-         <Text style={[styles.label, { marginTop: walletOpen ? 180 : 16 }]}>Description</Text>
+          <Text style={[styles.label, { marginTop: walletOpen ? 180 : 16 }]}>
+            Description
+          </Text>
           <TextInput
             style={[styles.input, styles.textArea]}
             placeholder="Add notes (optional)"
@@ -274,7 +312,9 @@ export default function AddTransaction({
             textAlignVertical="top"
           />
 
-            <Text style={[styles.label, { marginTop: walletOpen ? 180 : 16 }]}>Date</Text>
+          <Text style={[styles.label, { marginTop: walletOpen ? 180 : 16 }]}>
+            Date
+          </Text>
           <TouchableOpacity
             style={styles.dateButton}
             onPress={() => setShowDatePicker(true)}
@@ -303,14 +343,13 @@ export default function AddTransaction({
             />
           )}
 
-          {/* Action Buttons */}
           <View style={styles.buttonContainer}>
             <TouchableOpacity
               style={styles.saveButton}
-              onPress={handleSave}
+              onPress={handleUpdate}
               activeOpacity={0.8}
             >
-              <Text style={styles.saveButtonText}>Save Transaction</Text>
+              <Text style={styles.saveButtonText}>Save Changes</Text>
             </TouchableOpacity>
 
             <TouchableOpacity

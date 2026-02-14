@@ -14,6 +14,7 @@ import {
   Alert,
   Platform,
 } from "react-native";
+import DropDownPicker from "react-native-dropdown-picker";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 interface Wallet {
@@ -32,6 +33,14 @@ export default function Wallet() {
   const [showModal, setShowModal] = useState(false);
   const [walletName, setWalletName] = useState("");
   const [walletBalance, setWalletBalance] = useState("");
+
+  const [categoryOpen, setCategoryOpen] = useState(false);
+  const [category, setCategory] = useState(null);
+
+  const [categoryItems, setCategoryItems] = useState([
+    { label: "CASH", value: "CASH" },
+    { label: "CARD", value: "CARD" },
+  ]);
 
   const [user, setUser] = useState<{
     id: number;
@@ -63,44 +72,41 @@ export default function Wallet() {
       : "http://192.168.8.115:8080/backend/api/wallet/public";
 
   const userId = user?.id;
-     console.log(userId);
+  console.log(userId);
 
   useEffect(() => {
-  const fetchWallets = async () => {
-    if (!userId) return;
+    const fetchWallets = async () => {
+      if (!userId) return;
 
-    
-
-    try {
-      const res = await fetch(`${WALLET_API}/${userId}`, {
-        method: "GET",
-        headers: { "Content-Type": "application/json" },
-      });
-
-      const text = await res.text();
-      console.log("Raw backend response:", text);
-
-      let json;
       try {
-        json = JSON.parse(text);
-      } catch (parseError) {
-        console.error("Failed to parse JSON:", parseError);
-        return;
-      }
-      
-      if (json.wallets) {
-        console.log("Wallets loaded:", json.wallets);
-      }
-    } catch (error) {
-      console.error("Failed to load wallets:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+        const res = await fetch(`${WALLET_API}/${userId}`, {
+          method: "GET",
+          headers: { "Content-Type": "application/json" },
+        });
 
-  fetchWallets();
-}, [userId]);
+        const text = await res.text();
+        console.log("Raw backend response:", text);
 
+        let json;
+        try {
+          json = JSON.parse(text);
+        } catch (parseError) {
+          console.error("Failed to parse JSON:", parseError);
+          return;
+        }
+
+        if (json.wallets) {
+          console.log("Wallets loaded:", json.wallets);
+        }
+      } catch (error) {
+        console.error("Failed to load wallets:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchWallets();
+  }, [userId]);
 
   const handleAddWallet = () => {
     if (!walletName.trim()) {
@@ -224,8 +230,25 @@ export default function Wallet() {
               />
             </View>
 
+            <Text style={[styles.inputLabel]}>Wallet Type</Text>
+            <DropDownPicker
+              open={categoryOpen}
+              value={category}
+              items={categoryItems}
+              setOpen={setCategoryOpen}
+              setValue={setCategory}
+              setItems={setCategoryItems}
+              placeholder="Select wallet type"
+              style={styles.dropdown}
+              textStyle={styles.dropdownText}
+              dropDownContainerStyle={styles.dropdownContainer}
+              listItemLabelStyle={styles.dropdownItemText}
+              zIndex={3000}
+              zIndexInverse={1000}
+            />
+
             <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Initial Balance</Text>
+               <Text style={[styles.inputLabel, {marginTop:10}]}>Wallet Type</Text>
               <TextInput
                 style={styles.input}
                 placeholder="0.00"
@@ -259,6 +282,31 @@ export default function Wallet() {
 }
 
 const styles = StyleSheet.create({
+  dropdown: {
+    backgroundColor: "#2a2a2a",
+    borderWidth: 1,
+    borderColor: "#3a3a3a",
+    borderRadius: 12,
+    minHeight: 50,
+  },
+
+  dropdownText: {
+    color: "#fff",
+    fontSize: 16,
+  },
+
+  dropdownContainer: {
+    backgroundColor: "#2a2a2a",
+    borderWidth: 1,
+    borderColor: "#3a3a3a",
+    borderRadius: 12,
+    marginTop: 4,
+  },
+
+  dropdownItemText: {
+    color: "#fff",
+    fontSize: 15,
+  },
   container: {
     flex: 1,
     backgroundColor: "#000",

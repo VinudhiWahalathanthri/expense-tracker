@@ -8,7 +8,7 @@ type Expense = {
   type: string;
   date: string;
   color: string;
-  icon: React.ElementType;
+  // icon: React.ElementType;
 };
 
 type Props = {
@@ -16,13 +16,13 @@ type Props = {
 };
 
 export default function ExpenseItem({ expense }: Props) {
-  const Icon = expense.icon;
+  // const Icon = expense.icon;
 
   return (
     <TouchableOpacity style={styles.container} activeOpacity={0.8}>
-      <View style={[styles.iconWrapper, { backgroundColor: expense.color }]}>
+      {/* <View style={[styles.iconWrapper, { backgroundColor: expense.color }]}>
         <Icon size={20} color="#fff" />
-      </View>
+      </View> */}
       <View style={styles.info}>
         <Text style={styles.name} numberOfLines={1}>
           {expense.name}
