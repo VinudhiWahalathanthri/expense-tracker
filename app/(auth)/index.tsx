@@ -54,31 +54,38 @@ const LoginScreen = () => {
   }, []);
 
   const handleLogin = async () => {
-    if (!email || !password) {
-      Alert.alert("Error", "Please fill all fields");
-      return;
-    }
+    // if (!email || !password) {
+    //   Alert.alert("Error", "Please fill all fields");
+    //   return;
+    // }
 
-    try {
-      const response = await fetch(API_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
+    // try {
+    //   const response = await fetch(API_URL, {
+    //     method: "POST",
+    //     headers: { "Content-Type": "application/json" },
+    //     body: JSON.stringify({ email, password }),
+    //   });
 
-      const data = await response.json();
+    //   const data = await response.json();
 
-      if (response.ok && data.status) {
-        await AsyncStorage.setItem("user", JSON.stringify({ email }));
-        Alert.alert("Success", "Logged in successfully!");
+    //   if (response.ok && data.status) {
+    //     const userData = {
+    //       id:data.data.id,
+    //       firstName: data.data.firstName,
+    //       lastName: data.data.lastName,
+    //       email: data.data.email,
+    //     };
+
+    //     await AsyncStorage.setItem("user", JSON.stringify(userData));
+    //     Alert.alert("Success", "Logged in successfully!");
         router.replace("/(tabs)/home");
-      } else {
-        Alert.alert("Error", data.message || "Login failed");
-      }
-    } catch (error) {
-      console.error(error);
-      Alert.alert("Error", "Cannot connect to server");
-    }
+    //   } else {
+    //     Alert.alert("Error", data.message || "Login failed");
+    //   }
+    // } catch (error) {
+    //   console.error(error);
+    //   Alert.alert("Error", "Cannot connect to server");
+    // }
   };
   return (
     <SafeAreaView style={styles.container}>

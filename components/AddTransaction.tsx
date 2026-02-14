@@ -84,6 +84,24 @@ export default function AddTransaction({ onClose, onSave }: { onClose: () => voi
         listItemLabelStyle={{ color: "#fff" }}
       />
 
+       <Text style={[styles.label, {marginBottom:15}]}>Select Wallet</Text>
+       <DropDownPicker
+        open={open}
+        value={category}
+        items={items}
+        setOpen={setOpen}
+        setValue={setCategory}
+        setItems={setItems}
+        placeholder="Select a category"
+        style={styles.dropdown}
+        textStyle={{ color: "#fff" }}
+        dropDownContainerStyle={{
+          backgroundColor: "#2a2a2a",
+          borderWidth: 0,
+        }}
+        listItemLabelStyle={{ color: "#fff" }}
+      />
+
       <Text style={styles.label}>Amount</Text>
       <TextInput
         style={styles.input}
@@ -123,15 +141,6 @@ export default function AddTransaction({ onClose, onSave }: { onClose: () => voi
             if (selectedDate) setDate(selectedDate);
           }}
         />
-      )}
-
-      <Text style={styles.label}>Receipt</Text>
-      <TouchableOpacity style={styles.imageButton} onPress={pickImage}>
-        <MaterialCommunityIcons name="image-plus" size={24} color="#fff" />
-        <Text style={{ color: "#fff", marginTop:10 }}>Pick an image</Text>
-      </TouchableOpacity>
-      {receipt && (
-        <Image source={{ uri: receipt }} style={styles.receiptImage} />
       )}
 
       <TouchableOpacity style={styles.saveButton} onPress={handleSave}>

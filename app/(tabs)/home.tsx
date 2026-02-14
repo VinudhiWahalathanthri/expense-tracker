@@ -4,7 +4,7 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -17,6 +17,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Icon } from "react-native-screens";
+import { useUser } from "@/hooks/useUser";
 
 export default function Home() {
   const expenses = [
@@ -71,24 +72,48 @@ export default function Home() {
     console.log("Saved Transaction:", transaction);
   };
 
-    const handleLogout = async () => {
+  const handleLogout = async () => {
     try {
-      await AsyncStorage.removeItem("user"); // Remove stored user
+      await AsyncStorage.removeItem("user");
       Alert.alert("Logged out", "You have been logged out successfully!");
-      router.replace("/(auth)"); // Redirect to login screen
+      router.replace("/(auth)");
     } catch (err) {
       console.error("Error logging out:", err);
       Alert.alert("Error", "Something went wrong. Try again.");
     }
   };
-  
+  const [user, setUser] = useState<{
+    firstName: string;
+    lastName: string;
+    email: string;
+  } | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const userData = await AsyncStorage.getItem("user");
+        if (userData) {
+          setUser(JSON.parse(userData));
+        }
+      } catch (err) {
+        console.error("Error fetching user:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUser();
+  }, []);
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <View>
           <Text style={styles.greeting}>Hello,</Text>
-          <Text style={styles.name}>Vinudhi Wahalathanthri</Text>
+          <Text style={styles.name}>
+            {user ? `${user.firstName} ${user.lastName}` : "User"}
+          </Text>
         </View>
 
         <Pressable style={styles.searchButton} onPress={handleLogout}>
@@ -152,7 +177,7 @@ export default function Home() {
         transparent={true}
         onRequestClose={() => setShowModal(false)}
       >
-        <View style={{ flex:1, backgroundColor: "rgba(0,0,0,0.7)" }}>
+        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.7)" }}>
           <AddTransaction
             onClose={() => setShowModal(false)}
             onSave={handleSaveTransaction}
