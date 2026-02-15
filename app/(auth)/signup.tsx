@@ -15,7 +15,6 @@ import React, { useEffect, useState } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router, useNavigation } from "expo-router";
-// import { useAuth } from "@/context/AuthContext";
 type Student = {
   id: string;
   name?: string;
@@ -93,7 +92,7 @@ const SignUpScreen = () => {
 
       if (response.ok && data.status) {
         Alert.alert("Success", data.message);
-        navigation.navigate("(auth)");
+       router.push("/(auth)")
       } else {
         Alert.alert("Error", data.message || "Failed to register");
       }

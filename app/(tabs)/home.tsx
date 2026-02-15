@@ -48,6 +48,7 @@ export default function Home() {
   const [showModal, setShowModal] = useState(false);
 
   const [user, setUser] = useState<{
+    id: string;
     firstName: string;
     lastName: string;
     email: string;
@@ -108,7 +109,7 @@ export default function Home() {
 
   const fetchWallets = async () => {
     try {
-      const res = await fetch(`${WALLET_API}/public/${user.id}`);
+      const res = await fetch(`${WALLET_API}/public/${user?.id}`);
       const json = await res.json();
 
       if (json.wallets) {

@@ -103,7 +103,6 @@ const LoginScreen = () => {
           </Text>
           <Text style={styles.subTitle}>Login to track all your expenses</Text>
 
-          {/* Email */}
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Email</Text>
             <View
@@ -131,7 +130,7 @@ const LoginScreen = () => {
             </View>
           </View>
 
-          {/* Password */}
+      
           <View style={styles.passwordContainer}>
             <Text style={styles.label}>Password</Text>
             <View
@@ -159,15 +158,13 @@ const LoginScreen = () => {
             </View>
           </View>
 
-          {/* Login Button */}
           <TouchableOpacity
             style={styles.loginButton}
-            onPress={handleLogin} // Correct function call
+            onPress={handleLogin}
           >
             <Text style={styles.loginButtonText}>Login</Text>
           </TouchableOpacity>
 
-          {/* Sign Up link */}
           <View
             style={{
               flexDirection: "row",

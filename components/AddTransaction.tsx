@@ -226,7 +226,7 @@ export default function AddTransaction({
     >
       <ScrollView
         contentContainerStyle={styles.scrollContainer}
-        keyboardShouldPersistTaps="handled"
+        keyboardShouldPersistTaps="handled"  
       >
         <View style={styles.container}>
           <View style={styles.header}>
@@ -300,6 +300,7 @@ export default function AddTransaction({
             onOpen={() => setCategoryOpen(false)}
             zIndex={2000}
             zIndexInverse={2000}
+             
           />
 
           <Text style={[styles.label, { marginTop: 16 }]}>Amount *</Text>

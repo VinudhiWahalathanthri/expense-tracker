@@ -62,8 +62,7 @@ export default function Profile() {
           <View style={styles.avatarContainer}>
             <View style={styles.avatar}>
               <Text style={styles.avatarText}>
-                {user?.firstName &&
-                  user?.lastName
+                {user?.firstName
                     .split(" ")
                     .map((n) => n[0])
                     .join("")

@@ -9,6 +9,18 @@ export const unstable_settings = {
   anchor: '(tabs)',
 };
 
+import { LogBox } from "react-native";
+
+// Ignore specific warnings
+LogBox.ignoreLogs([
+  "VirtualizedLists should never be nested", // your dropdown warning
+  "Warning: ...", // any other warning string
+]);
+
+// Ignore all warnings (not recommended for production)
+LogBox.ignoreAllLogs(true);
+
+
 export default function RootLayout() {
   const colorScheme = useColorScheme();
 

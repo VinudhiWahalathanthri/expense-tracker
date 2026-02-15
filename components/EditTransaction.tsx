@@ -50,6 +50,7 @@ type Transaction = {
 type EditTransactionProps = {
   transaction: Transaction;
   onClose: () => void;
+  loadTransactions: () => void;
 };
 
 export default function EditTransaction({
@@ -285,6 +286,7 @@ export default function EditTransaction({
               if (data.status) {
                 Alert.alert("Success", "Transaction deleted successfully");
                 sendMessage(JSON.stringify({ type: "TRANSACTION_UPDATED" }));
+                loadTransactions();
                 onClose();
               } else {
                 Alert.alert(
@@ -376,6 +378,7 @@ export default function EditTransaction({
             onOpen={() => setWalletOpen(false)}
             zIndex={3000}
             zIndexInverse={1000}
+             listMode="MODAL" 
           />
 
           <Text style={[styles.label, { marginTop: categoryOpen ? 180 : 16 }]}>
