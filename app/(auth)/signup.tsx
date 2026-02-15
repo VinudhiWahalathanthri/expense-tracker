@@ -26,7 +26,10 @@ type Student = {
 const API_URL =
   Platform.OS === "android"
     ? "http://10.0.2.2:8080/backend/api/users"
-    : "http://192.168.8.115:8080/backend/api/users";
+    // : "http://192.168.8.115:8080/backend/api/users";
+    : "http://localhost:8080/backend/api/users";
+    
+    
 
 
 const SignUpScreen = () => {

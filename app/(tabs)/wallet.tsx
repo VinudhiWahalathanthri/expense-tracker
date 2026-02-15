@@ -21,7 +21,7 @@ interface Wallet {
   id: string;
   name: string;
   balance: number;
-  wallatType: string;
+  walletType: string;
   color: string;
   icon: string;
 }
@@ -35,7 +35,7 @@ export default function Wallet() {
   const [walletBalance, setWalletBalance] = useState("");
 
   const [categoryOpen, setCategoryOpen] = useState(false);
-  const [category, setCategory] = useState(null);
+  const [category, setCategory] = useState<string | null>(null);
 
   const [categoryItems, setCategoryItems] = useState([
     { label: "CASH", value: "CASH" },
@@ -49,20 +49,20 @@ export default function Wallet() {
     email: string;
   } | null>(null);
 
-  useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const userData = await AsyncStorage.getItem("user");
-        if (userData) {
-          setUser(JSON.parse(userData));
-        }
-      } catch (err) {
-        console.error("Error fetching user:", err);
-      } finally {
-        setLoading(false);
+  const fetchUser = async () => {
+    try {
+      const userData = await AsyncStorage.getItem("user");
+      if (userData) {
+        setUser(JSON.parse(userData));
       }
-    };
+    } catch (err) {
+      console.error("Error fetching user:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     fetchUser();
   }, []);
 
@@ -71,44 +71,62 @@ export default function Wallet() {
       ? "http://10.0.2.2:8080/backend/api/wallet/public"
       : "http://192.168.8.115:8080/backend/api/wallet/public";
 
+       const WALLET_API2 =
+    Platform.OS === "android"
+      ? "http://10.0.2.2:8080/backend/api/wallet"
+      : "http://192.168.8.115:8080/backend/api/wallet";
+
   const userId = user?.id;
   console.log(userId);
 
-  useEffect(() => {
-    const fetchWallets = async () => {
-      if (!userId) return;
+  const fetchWallets = async () => {
+    if (!userId) return;
 
+    try {
+      const res = await fetch(`${WALLET_API}/${userId}`, {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+      });
+
+      const text = await res.text();
+      console.log("Raw backend response:", text);
+
+      let json;
       try {
-        const res = await fetch(`${WALLET_API}/${userId}`, {
-          method: "GET",
-          headers: { "Content-Type": "application/json" },
-        });
-
-        const text = await res.text();
-        console.log("Raw backend response:", text);
-
-        let json;
-        try {
-          json = JSON.parse(text);
-        } catch (parseError) {
-          console.error("Failed to parse JSON:", parseError);
-          return;
-        }
-
-        if (json.wallets) {
-          console.log("Wallets loaded:", json.wallets);
-        }
-      } catch (error) {
-        console.error("Failed to load wallets:", error);
-      } finally {
-        setLoading(false);
+        json = JSON.parse(text);
+      } catch (parseError) {
+        console.error("Failed to parse JSON:", parseError);
+        return;
       }
-    };
 
+      if (json.wallets) {
+        console.log(wallets);
+        const colors = ["#10b981", "#3b82f6", "#f59e0b", "#ef4444", "#8b5cf6"];
+        const icons = ["cash", "card", "wallet"];
+
+        const mappedWallets: Wallet[] = json.wallets.map((w: any) => ({
+          id: w.value.toString(),
+          name: w.name,
+          balance: Number(w.balance),
+          walletType: w.walletType,
+          color: colors[Math.floor(Math.random() * colors.length)],
+          icon: icons[Math.floor(Math.random() * icons.length)],
+        }));
+
+        setWallets(mappedWallets);
+      }
+    } catch (error) {
+      console.error("Failed to load wallets:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchWallets();
   }, [userId]);
 
-  const handleAddWallet = () => {
+  const handleAddWallet = async () => {
     if (!walletName.trim()) {
       Alert.alert("Error", "Please enter a wallet name");
       return;
@@ -119,22 +137,55 @@ export default function Wallet() {
       return;
     }
 
-    const colors = ["#10b981", "#3b82f6", "#f59e0b", "#ef4444", "#8b5cf6"];
-    const icons = ["cash", "card", "wallet"];
+    if (!category) {
+      Alert.alert("Error", "Please select a wallet type");
+      return;
+    }
 
-    const newWallet: Wallet = {
-      id: Date.now().toString(),
-      name: walletName,
-      balance: parseFloat(walletBalance),
-      color: colors[Math.floor(Math.random() * colors.length)],
-      icon: icons[Math.floor(Math.random() * icons.length)],
-    };
+    if (!userId) {
+      Alert.alert("Error", "User not found");
+      return;
+    }
 
-    setWallets([...wallets, newWallet]);
-    setWalletName("");
-    setWalletBalance("");
-    setShowModal(false);
-    Alert.alert("Success", "Wallet added successfully!");
+    try {
+      const res = await fetch(`${WALLET_API2}/add`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          userId: userId,
+          name: walletName,
+          balance: Number(walletBalance),
+          walletType: category,
+        }),
+      });
+
+      const text = await res.text();
+      console.log("Add wallet response:", text);
+
+      let json;
+      try {
+        json = JSON.parse(text);
+      } catch {
+        Alert.alert("Error", "Invalid server response");
+        return;
+      }
+
+      if (json.status === true || json.success === true) {
+        Alert.alert("Success", "Wallet added successfully!");
+        setWalletName("");
+        setWalletBalance("");
+        setCategory(null);
+        setShowModal(false);
+        fetchWallets();
+      } else {
+        Alert.alert("Error", json.message || "Failed to add wallet");
+      }
+    } catch (error) {
+      console.error("Add wallet error:", error);
+      Alert.alert("Error", "Server error while adding wallet");
+    }
   };
 
   const renderWalletItem = ({ item }: { item: Wallet }) => (
@@ -223,7 +274,7 @@ export default function Wallet() {
               <Text style={styles.inputLabel}>Wallet Name</Text>
               <TextInput
                 style={styles.input}
-                placeholder="e.g., Credit Card"
+                placeholder="e.g., Mom's Card"
                 placeholderTextColor="#6b7280"
                 value={walletName}
                 onChangeText={setWalletName}
@@ -248,7 +299,9 @@ export default function Wallet() {
             />
 
             <View style={styles.inputContainer}>
-               <Text style={[styles.inputLabel, {marginTop:10}]}>Wallet Type</Text>
+              <Text style={[styles.inputLabel, { marginTop: 10 }]}>
+                Balance
+              </Text>
               <TextInput
                 style={styles.input}
                 placeholder="0.00"
