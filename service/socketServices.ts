@@ -3,7 +3,7 @@ let socket: WebSocket | null = null;
 export const connectWebSocket = (
   onMessage: (data: string) => void
 ): void => {
-  socket = new WebSocket('ws://10.0.2.2:8080/api/ws/practical');
+  socket = new WebSocket('ws://192.168.8.115:8080/backend/ws/practical');
 
   socket.onopen = () => {
     console.log('WebSocket connection established');

@@ -19,7 +19,7 @@ export default function ExpenseItem({ expense }: Props) {
   // const Icon = expense.icon;
 
   return (
-    <TouchableOpacity style={styles.container} activeOpacity={0.8}>
+    <View style={styles.container}>
       {/* <View style={[styles.iconWrapper, { backgroundColor: expense.color }]}>
         <Icon size={20} color="#fff" />
       </View> */}
@@ -33,16 +33,16 @@ export default function ExpenseItem({ expense }: Props) {
         <Text
           style={[
             styles.amount,
-            { color: expense.type === "expense" ? "#ef4444" : "#aeff00" },
+            { color: expense.type === "Expense" ? "#ef4444" : "#aeff00" },
           ]}
         >
-          {expense.type === "expense"
+          {expense.type === "Expense"
             ? `- $${expense.amount.toFixed(2)}`
             : `+ $${expense.amount.toFixed(2)}`}
         </Text>
         <Text style={styles.date}>{expense.date}</Text>
       </View>
-    </TouchableOpacity>
+    </View>
   );
 }
 

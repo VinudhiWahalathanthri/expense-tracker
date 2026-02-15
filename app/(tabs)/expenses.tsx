@@ -1,7 +1,10 @@
 import EditTransaction from "@/components/EditTransaction";
 import ExpenseItem from "@/components/ExpenseItem";
-import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import React, { useState } from "react";
+import { closeConnection, connectWebSocket } from "@/service/socketServices";
+import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useFocusEffect } from "expo-router";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -11,111 +14,121 @@ import {
   Modal,
   TextInput,
   Pressable,
-  Alert,
+  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 type Transaction = {
   id: string;
-  title: string;
-  description: string | null;
+  name: string;
+  description: string;
+  category: string;
+  type: string;
   amount: number;
-  created_at: string;
-  categoryName: string;
-  categoryColor: string;
-  categoryIcon: string;
-  type: "income" | "expense";
+  date: string;
+  color: string;
 };
 
 export default function Expenses() {
-  const [transactions, setTransactions] = useState<Transaction[]>([
-    {
-      id: "1",
-      title: "Grocery Shopping",
-      description: "Weekly groceries",
-      amount: 156.50,
-      created_at: new Date().toISOString(),
-      categoryName: "Food",
-      categoryColor: "#10b981",
-      categoryIcon: "fast-food",
-      type: "expense",
-    },
-    {
-      id: "2",
-      title: "Salary",
-      description: "Monthly salary",
-      amount: 5000.00,
-      created_at: new Date(Date.now() - 86400000).toISOString(),
-      categoryName: "Salary",
-      categoryColor: "#3b82f6",
-      categoryIcon: "cash",
-      type: "income",
-    },
-    {
-      id: "3",
-      title: "Uber Ride",
-      description: null,
-      amount: 24.30,
-      created_at: new Date(Date.now() - 86400000).toISOString(),
-      categoryName: "Transport",
-      categoryColor: "#f59e0b",
-      categoryIcon: "car",
-      type: "expense",
-    },
-    {
-      id: "4",
-      title: "Netflix Subscription",
-      description: "Monthly subscription",
-      amount: 15.99,
-      created_at: new Date(Date.now() - 172800000).toISOString(),
-      categoryName: "Entertainment",
-      categoryColor: "#ef4444",
-      categoryIcon: "game-controller",
-      type: "expense",
-    },
-    {
-      id: "5",
-      title: "Freelance Project",
-      description: "Web design project",
-      amount: 800.00,
-      created_at: new Date(Date.now() - 259200000).toISOString(),
-      categoryName: "Business",
-      categoryColor: "#8b5cf6",
-      categoryIcon: "briefcase",
-      type: "income",
-    },
-    {
-      id: "6",
-      title: "Coffee",
-      description: "Morning coffee",
-      amount: 4.50,
-      created_at: new Date(Date.now() - 345600000).toISOString(),
-      categoryName: "Food",
-      categoryColor: "#10b981",
-      categoryIcon: "fast-food",
-      type: "expense",
-    },
-    {
-      id: "7",
-      title: "Groceries",
-      description: null,
-      amount: 85.34,
-      created_at: new Date(Date.now() - 432000000).toISOString(),
-      categoryName: "Food",
-      categoryColor: "#10b981",
-      categoryIcon: "fast-food",
-      type: "expense",
-    },
-  ]);
-
-  const [filteredTransactions, setFilteredTransactions] = useState<Transaction[]>(transactions);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [filteredTransactions, setFilteredTransactions] = useState<
+    Transaction[]
+  >([]);
   const [searchQuery, setSearchQuery] = useState("");
-  
-  // Edit modal state
   const [editModalVisible, setEditModalVisible] = useState(false);
-  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
+  const [selectedTransaction, setSelectedTransaction] =
+    useState<Transaction | null>(null);
 
-  // Search handler
+  const [user, setUser] = useState<{
+    id: number;
+    firstName: string;
+    lastName: string;
+    email: string;
+  } | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const userData = await AsyncStorage.getItem("user");
+        if (userData) {
+          setUser(JSON.parse(userData));
+        }
+      } catch (err) {
+        console.error("Error fetching user:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUser();
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!user) return;
+
+      connectWebSocket((message: string) => {
+        console.log("WebSocket message received:", message);
+
+        let data;
+        try {
+          data = JSON.parse(message);
+        } catch {
+          data = { type: message };
+        }
+
+        if (data.type === "TRANSACTION_UPDATED") fetchTransactions();
+      });
+
+      fetchTransactions();
+
+      return () => {
+        closeConnection();
+      };
+    }, [user]),
+  );
+
+  const TRANSACTION_API =
+    Platform.OS === "android"
+      ? "http://10.0.2.2:8080/backend/api/transaction"
+      : "http://192.168.8.115:8080/backend/api/transaction";
+
+  const fetchTransactions = async () => {
+    try {
+      const res = await fetch(`${TRANSACTION_API}/public/${user?.id}`);
+      const json = await res.json();
+
+      if (json.status && json.transactions) {
+        const colors = ["#10b981", "#3b82f6", "#f59e0b", "#ef4444", "#8b5cf6"];
+
+        const mapped: Transaction[] = json.transactions.map((t: any) => ({
+          id: t.id.toString(),
+          name: t.title,
+          description: t.description || "",
+          category: t.category.value,
+          type: t.type.value === "Income" ? "Income" : "Expense",
+          amount: Number(t.amount),
+          date: new Date(t.createdAt).toLocaleDateString("en-US", {
+            month: "short",
+            day: "numeric",
+          }),
+          color: colors[Math.floor(Math.random() * colors.length)],
+        }));
+
+        setTransactions(mapped);
+        setFilteredTransactions(mapped);
+      }
+    } catch (err) {
+      console.error("Failed to fetch transactions:", err);
+    }
+  };
+
+  useEffect(() => {
+    if (!user) return;
+    fetchTransactions();
+  }, [user]);
+
   const handleSearch = (query: string) => {
     setSearchQuery(query);
     if (query.trim() === "") {
@@ -123,120 +136,24 @@ export default function Expenses() {
     } else {
       const filtered = transactions.filter(
         (t) =>
-          t.title.toLowerCase().includes(query.toLowerCase()) ||
-          t.description?.toLowerCase().includes(query.toLowerCase()) ||
-          t.categoryName.toLowerCase().includes(query.toLowerCase())
+          t.name.toLowerCase().includes(query.toLowerCase()) ||
+          t.category.toLowerCase().includes(query.toLowerCase()),
       );
       setFilteredTransactions(filtered);
     }
   };
 
-  // Calculate totals
-  const getTotalBalance = () => {
-    return transactions.reduce((sum, t) => {
-      return t.type === "income" ? sum + t.amount : sum - t.amount;
-    }, 0);
-  };
-
-  const getMonthlyExpenses = () => {
-    const currentMonth = new Date().getMonth();
-    return transactions
-      .filter((t) => {
-        const transactionDate = new Date(t.created_at);
-        return (
-          t.type === "expense" && transactionDate.getMonth() === currentMonth
-        );
-      })
-      .reduce((sum, t) => sum + t.amount, 0);
-  };
-
-  const getMonthlyIncome = () => {
-    const currentMonth = new Date().getMonth();
-    return transactions
-      .filter((t) => {
-        const transactionDate = new Date(t.created_at);
-        return (
-          t.type === "income" && transactionDate.getMonth() === currentMonth
-        );
-      })
-      .reduce((sum, t) => sum + t.amount, 0);
-  };
-
-  // Handle transaction press
   const handleTransactionPress = (transaction: Transaction) => {
     setSelectedTransaction(transaction);
     setEditModalVisible(true);
   };
 
-  // Handle transaction update
-  const handleUpdateTransaction = (updatedTransaction: Transaction) => {
-    const updatedTransactions = transactions.map((t) =>
-      t.id === updatedTransaction.id ? updatedTransaction : t
-    );
-    setTransactions(updatedTransactions);
-    setFilteredTransactions(
-      searchQuery.trim() === ""
-        ? updatedTransactions
-        : updatedTransactions.filter(
-            (t) =>
-              t.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-              t.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-              t.categoryName.toLowerCase().includes(searchQuery.toLowerCase())
-          )
-    );
-  };
-
-  // Handle transaction delete
-  const handleDeleteTransaction = (transactionId: string) => {
-    const updatedTransactions = transactions.filter((t) => t.id !== transactionId);
-    setTransactions(updatedTransactions);
-    setFilteredTransactions(
-      searchQuery.trim() === ""
-        ? updatedTransactions
-        : updatedTransactions.filter(
-            (t) =>
-              t.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-              t.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-              t.categoryName.toLowerCase().includes(searchQuery.toLowerCase())
-          )
-    );
-  };
-
-  return (
-    <SafeAreaView style={styles.container}>
-      {/* Header */}
+  const renderHeader = () => (
+    <>
       <View style={styles.header}>
         <Text style={styles.title}>My Expenses</Text>
       </View>
 
-      {/* Summary Card */}
-      <View style={styles.summaryCard}>
-        <View style={styles.summaryItem}>
-          <Text style={styles.summaryLabel}>Total Balance</Text>
-          <Text style={styles.summaryAmount}>
-            ${getTotalBalance().toLocaleString("en-US", {
-              minimumFractionDigits: 2,
-            })}
-          </Text>
-        </View>
-
-        <View style={styles.summaryRow}>
-          <View style={styles.summaryItemSmall}>
-            <Text style={styles.summaryLabelSmall}>Income</Text>
-            <Text style={[styles.summaryAmountSmall, { color: "#10b981" }]}>
-              +${getMonthlyIncome().toFixed(2)}
-            </Text>
-          </View>
-          <View style={styles.summaryItemSmall}>
-            <Text style={styles.summaryLabelSmall}>Expenses</Text>
-            <Text style={[styles.summaryAmountSmall, { color: "#ef4444" }]}>
-              -${getMonthlyExpenses().toFixed(2)}
-            </Text>
-          </View>
-        </View>
-      </View>
-
-      {/* Search Bar */}
       <View style={styles.searchContainer}>
         <Ionicons
           name="search"
@@ -258,33 +175,37 @@ export default function Expenses() {
         )}
       </View>
 
-      {/* Transactions List */}
-      <View style={styles.transactionsSection}>
-        <Text style={styles.sectionTitle}>Recent Transactions</Text>
-        {filteredTransactions.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Ionicons name="receipt-outline" size={64} color="#374151" />
-            <Text style={styles.emptyStateText}>No transactions found</Text>
-            <Text style={styles.emptyStateSubtext}>
-              {searchQuery.trim() === ""
-                ? "Add your first transaction to get started"
-                : "Try adjusting your search"}
-            </Text>
-          </View>
-        ) : (
-          <FlatList
-            data={filteredTransactions}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => (
-              <Pressable onPress={() => handleTransactionPress(item)}>
-                <ExpenseItem transaction={item} />
-              </Pressable>
-            )}
-            contentContainerStyle={{ paddingBottom: 100 }}
-            showsVerticalScrollIndicator={false}
-          />
+      <Text style={styles.sectionTitle}>Recent Transactions</Text>
+    </>
+  );
+
+  const renderEmptyState = () => (
+    <View style={styles.emptyState}>
+      <Ionicons name="receipt-outline" size={64} color="#374151" />
+      <Text style={styles.emptyStateText}>No transactions found</Text>
+      <Text style={styles.emptyStateSubtext}>
+        {searchQuery.trim() === ""
+          ? "Add your first transaction to get started"
+          : "Try adjusting your search"}
+      </Text>
+    </View>
+  );
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <FlatList
+        data={filteredTransactions}
+        keyExtractor={(item) => item.id}
+        ListHeaderComponent={renderHeader}
+        ListEmptyComponent={renderEmptyState}
+        renderItem={({ item }) => (
+          <Pressable onPress={() => handleTransactionPress(item)}>
+            <ExpenseItem expense={item} />
+          </Pressable>
         )}
-      </View>
+        contentContainerStyle={{ paddingBottom: 100 }}
+        showsVerticalScrollIndicator={false}
+      />
 
       {editModalVisible && selectedTransaction && (
         <Modal
@@ -295,6 +216,7 @@ export default function Expenses() {
         >
           <EditTransaction
             transaction={selectedTransaction}
+            loadTransactions={fetchTransactions}
             onClose={() => setEditModalVisible(false)}
           />
         </Modal>
@@ -387,10 +309,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
 
-  transactionsSection: {
-    flex: 1,
-  },
-
   sectionTitle: {
     color: "#fff",
     fontSize: 18,
@@ -399,10 +317,9 @@ const styles = StyleSheet.create({
   },
 
   emptyState: {
-    flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    paddingTop: 80,
+    paddingVertical: 80,
   },
 
   emptyStateText: {

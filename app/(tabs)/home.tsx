@@ -3,8 +3,8 @@ import ExpenseItem from "@/components/ExpenseItem";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { LinearGradient } from "expo-linear-gradient";
-import { router } from "expo-router";
-import React, { useEffect, useState } from "react";
+import { router, useFocusEffect } from "expo-router";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -14,74 +14,39 @@ import {
   TouchableOpacity,
   Modal,
   Alert,
+  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Icon } from "react-native-screens";
 import { useUser } from "@/hooks/useUser";
+import { closeConnection, connectWebSocket } from "@/service/socketServices";
+
+type Transaction = {
+  id: string;
+  name: string;
+  category: string;
+  type: string;
+  amount: number;
+  date: string;
+  color: string;
+};
+
+type Wallet = {
+  id: string;
+  name: string;
+  balance: number;
+  walletType: string;
+  color: string;
+  icon: string;
+};
 
 export default function Home() {
-  const expenses = [
-    {
-      id: "1",
-      name: "Uber Ride",
-      category: "Transport",
-      type: "expense",
-      amount: 15.75,
-      date: "Feb 12",
-      color: "#10b981",
-      icon: () => <MaterialCommunityIcons name="car" size={20} color="#fff" />,
-    },
-    {
-      id: "2",
-      name: "Coffee",
-      category: "Food & Drink",
-      type: "expense",
-      amount: 4.5,
-      date: "Feb 12",
-      color: "#f59e0b",
-      icon: () => (
-        <MaterialCommunityIcons name="coffee" size={20} color="#fff" />
-      ),
-    },
-    {
-      id: "3",
-      name: "Netflix Subscription",
-      category: "Income",
-      type: "income",
-      amount: 12.99,
-      date: "Feb 10",
-      color: "#ef4444",
-      icon: () => <Ionicons name="cash" size={20} color="#fff" />,
-    },
-    {
-      id: "4",
-      name: "Groceries",
-      category: "Food & Drink",
-      type: "expense",
-      amount: 85.34,
-      date: "Feb 9",
-      color: "#3b82f6",
-      icon: () => <MaterialCommunityIcons name="cart" size={20} color="#fff" />,
-    },
-  ];
+  const [wallets, setWallets] = useState<Wallet[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
 
   const [showBalance, setShowBalance] = useState(true);
   const [showModal, setShowModal] = useState(false);
 
-  const handleSaveTransaction = (transaction: any) => {
-    console.log("Saved Transaction:", transaction);
-  };
-
-  const handleLogout = async () => {
-    try {
-      await AsyncStorage.removeItem("user");
-      Alert.alert("Logged out", "You have been logged out successfully!");
-      router.replace("/(auth)");
-    } catch (err) {
-      console.error("Error logging out:", err);
-      Alert.alert("Error", "Something went wrong. Try again.");
-    }
-  };
   const [user, setUser] = useState<{
     firstName: string;
     lastName: string;
@@ -106,8 +71,105 @@ export default function Home() {
     fetchUser();
   }, []);
 
-  return (
-    <SafeAreaView style={styles.container}>
+  useFocusEffect(
+    useCallback(() => {
+      if (!user) return;
+      connectWebSocket((message: string) => {
+        console.log("WebSocket message received:", message);
+
+        let data;
+        try {
+          data = JSON.parse(message);
+        } catch {
+          data = { type: message };
+        }
+
+        if (data.type === "WALLET_UPDATED") fetchWallets();
+        if (data.type === "TRANSACTION_UPDATED") fetchTransactions();
+      });
+      fetchWallets();
+      fetchTransactions();
+
+      return () => {
+        closeConnection();
+      };
+    }, [user]),
+  );
+
+  const WALLET_API =
+    Platform.OS === "android"
+      ? "http://10.0.2.2:8080/backend/api/wallet"
+      : "http://192.168.8.115:8080/backend/api/wallet";
+
+  const TRANSACTION_API =
+    Platform.OS === "android"
+      ? "http://10.0.2.2:8080/backend/api/transaction"
+      : "http://192.168.8.115:8080/backend/api/transaction";
+
+  const fetchWallets = async () => {
+    try {
+      const res = await fetch(`${WALLET_API}/public/${user.id}`);
+      const json = await res.json();
+
+      if (json.wallets) {
+        const colors = ["#10b981", "#3b82f6", "#f59e0b", "#ef4444", "#8b5cf6"];
+        const icons = ["cash", "card", "wallet"];
+        const mappedWallets: Wallet[] = json.wallets.map((w: any) => ({
+          id: w.value.toString(),
+          name: w.name,
+          balance: Number(w.balance),
+          walletType: w.walletType,
+          color: colors[Math.floor(Math.random() * colors.length)],
+          icon: icons[Math.floor(Math.random() * icons.length)],
+        }));
+        setWallets(mappedWallets);
+      }
+    } catch (err) {
+      console.error("Failed to fetch wallets:", err);
+    }
+  };
+
+  const fetchTransactions = async () => {
+    try {
+      const res = await fetch(`${TRANSACTION_API}/public/${user?.id}`);
+      const json = await res.json();
+
+      if (json.status && json.transactions) {
+        const mapped: Transaction[] = json.transactions.map((t: any) => ({
+          id: t.id.toString(),
+          name: t.title,
+          category: t.category.value,
+          type: t.type.value === "Income" ? "Income" : "Expense",
+          amount: Number(t.amount),
+          date: new Date(t.createdAt).toLocaleDateString("en-US", {
+            month: "short",
+            day: "numeric",
+          }),
+        }));
+        setTransactions(mapped);
+      }
+    } catch (err) {
+      console.error("Failed to fetch transactions:", err);
+    }
+  };
+
+  useEffect(() => {
+    if (!user) return;
+
+    fetchWallets();
+    fetchTransactions();
+  }, [user]);
+
+  const totalBalance = wallets.reduce((sum, w) => sum + w.balance, 0);
+  const totalIncome = transactions
+    .filter((t) => t.type === "Income")
+    .reduce((sum, t) => sum + t.amount, 0);
+  const totalExpense = transactions
+    .filter((t) => t.type === "Expense")
+    .reduce((sum, t) => sum + t.amount, 0);
+
+  const renderHeader = () => (
+    <>
       <View style={styles.header}>
         <View>
           <Text style={styles.greeting}>Hello,</Text>
@@ -116,7 +178,7 @@ export default function Home() {
           </Text>
         </View>
 
-        <Pressable style={styles.searchButton} onPress={handleLogout}>
+        <Pressable style={styles.searchButton}>
           <Ionicons name="search" size={20} color="#000" />
         </Pressable>
       </View>
@@ -138,7 +200,7 @@ export default function Home() {
           </View>
 
           <Text style={styles.balance}>
-            {showBalance ? "$12,458.50" : "••••••"}
+            {showBalance ? `$${totalBalance.toLocaleString()}` : "••••••"}
           </Text>
           <View style={styles.rowBetween}>
             <View style={styles.infoBlock}>
@@ -147,7 +209,7 @@ export default function Home() {
               </View>
               <Text style={styles.smallLabel}>Income</Text>
               <Text style={[styles.amount, { color: "#10b981" }]}>
-                $1,000,000
+                ${totalIncome.toLocaleString()}
               </Text>
             </View>
 
@@ -157,12 +219,29 @@ export default function Home() {
               </View>
               <Text style={styles.smallLabel}>Expense</Text>
               <Text style={[styles.amount, { color: "#ef4444" }]}>
-                $1,000,000
+                ${totalExpense.toLocaleString()}
               </Text>
             </View>
           </View>
         </View>
       </LinearGradient>
+
+      <Text style={[styles.name, { marginTop: 24, marginBottom: 12 }]}>
+        All Transactions
+      </Text>
+    </>
+  );
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <FlatList
+        data={transactions}
+        keyExtractor={(item) => item.id}
+        ListHeaderComponent={renderHeader}
+        renderItem={({ item }) => <ExpenseItem expense={item} />}
+        contentContainerStyle={{ paddingBottom: 80 }}
+        showsVerticalScrollIndicator={false}
+      />
 
       <TouchableOpacity
         onPress={() => setShowModal(true)}
@@ -180,24 +259,11 @@ export default function Home() {
         <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.7)" }}>
           <AddTransaction
             onClose={() => setShowModal(false)}
-            onSave={handleSaveTransaction}
+            onSave={fetchTransactions}
+            loadWallet={fetchWallets}
           />
         </View>
       </Modal>
-
-      <View style={{ marginTop: 24 }}>
-        <Text style={[styles.name, { marginBottom: 12 }]}>
-          Recent Transactions
-        </Text>
-
-        <FlatList
-          data={expenses}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => <ExpenseItem expense={item} />}
-          contentContainerStyle={{ paddingBottom: 16 }}
-          showsVerticalScrollIndicator={false}
-        />
-      </View>
     </SafeAreaView>
   );
 }

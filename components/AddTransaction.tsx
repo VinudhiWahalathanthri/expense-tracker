@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -14,30 +14,49 @@ import {
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { Ionicons } from "@expo/vector-icons";
 import DropDownPicker from "react-native-dropdown-picker";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { sendMessage } from "@/service/socketServices";
 
 type Transaction = {
   category: string;
   amount: string;
-  title:string;
+  title: string;
   description: string;
   date: Date;
-  type: "income" | "expense";
+  type: "Income" | "Expense";
   wallet: string;
+};
+
+type Wallet = {
+  id: string;
+  name: string;
+  balance: number;
+  walletType: string;
+  color: string;
+  icon: string;
+};
+
+type Category = {
+  id: string;
+  value: string;
+};
+
+type TransactionType = {
+  id: string;
+  value: string;
 };
 
 type AddTransactionProps = {
   onClose: () => void;
-  onSave: (transaction: Transaction) => void;
+  onSave: () => void;
+  loadWallet: () => void;
 };
-
 export default function AddTransaction({
   onClose,
   onSave,
+  loadWallet,
 }: AddTransactionProps) {
-  // Form state
-  const [selectedType, setSelectedType] = useState<"income" | "expense">(
-    "expense",
-  );
+  const [typeItems, setTypeItems] = useState<TransactionType[]>([]);
   const [category, setCategory] = useState<string | null>(null);
   const [wallet, setWallet] = useState<string | null>(null);
   const [amount, setAmount] = useState("");
@@ -46,76 +65,112 @@ export default function AddTransaction({
   const [date, setDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
 
-  // Dropdown states
   const [categoryOpen, setCategoryOpen] = useState(false);
   const [walletOpen, setWalletOpen] = useState(false);
 
-  // Dropdown items
-  const [categoryItems, setCategoryItems] = useState([
-    {
-      label: "Food & Dining",
-      value: "food",
-      icon: () => <Ionicons name="fast-food" size={18} color="#10b981" />,
-    },
-    {
-      label: "Transport",
-      value: "transport",
-      icon: () => <Ionicons name="car" size={18} color="#f59e0b" />,
-    },
-    {
-      label: "Entertainment",
-      value: "entertainment",
-      icon: () => <Ionicons name="game-controller" size={18} color="#ef4444" />,
-    },
-    {
-      label: "Shopping",
-      value: "shopping",
-      icon: () => <Ionicons name="cart" size={18} color="#8b5cf6" />,
-    },
-    {
-      label: "Bills & Utilities",
-      value: "bills",
-      icon: () => <Ionicons name="receipt" size={18} color="#3b82f6" />,
-    },
-    {
-      label: "Health",
-      value: "health",
-      icon: () => <Ionicons name="medical" size={18} color="#ec4899" />,
-    },
-    {
-      label: "Other",
-      value: "other",
-      icon: () => (
-        <Ionicons name="ellipsis-horizontal" size={18} color="#6b7280" />
-      ),
-    },
-  ]);
+  const [categoryItems, setCategoryItems] = useState<Category[]>([]);
+  const [walletItems, setWalletItems] = useState<Wallet[]>([]);
+  const [selectedType, setSelectedType] = useState<{
+    id: number;
+    value: string;
+  } | null>(null);
 
-  const [walletItems, setWalletItems] = useState([
-    {
-      label: "Cash",
-      value: "cash",
-      icon: () => <Ionicons name="cash" size={18} color="#10b981" />,
-    },
-    {
-      label: "Credit Card",
-      value: "credit",
-      icon: () => <Ionicons name="card" size={18} color="#3b82f6" />,
-    },
-    {
-      label: "Debit Card",
-      value: "debit",
-      icon: () => <Ionicons name="card-outline" size={18} color="#f59e0b" />,
-    },
-    {
-      label: "Bank Account",
-      value: "bank",
-      icon: () => <Ionicons name="business" size={18} color="#8b5cf6" />,
-    },
-  ]);
+  const [user, setUser] = useState<{
+    id: number;
+    firstName: string;
+    lastName: string;
+    email: string;
+  } | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const handleSave = () => {
-    if (!amount || !category || !wallet) {
+  const fetchUser = async () => {
+    try {
+      const userData = await AsyncStorage.getItem("user");
+      if (userData) setUser(JSON.parse(userData));
+    } catch (err) {
+      console.error("Error fetching user:", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchUser();
+  }, []);
+
+  const API_BASE =
+    Platform.OS === "android"
+      ? "http://10.0.2.2:8080/backend/api"
+      : "http://192.168.8.115:8080/backend/api";
+
+  const fetchWallets = async () => {
+    if (!user?.id) return;
+    try {
+      const res = await fetch(`${API_BASE}/wallet/public/${user.id}`);
+      const data = await res.json();
+      if (data.wallets) {
+        const colors = ["#10b981", "#3b82f6", "#f59e0b", "#ef4444", "#8b5cf6"];
+        const icons = ["cash", "card", "wallet"];
+        setWalletItems(
+          data.wallets.map((w: any) => ({
+            id: w.value.toString(),
+            name: w.name,
+            balance: Number(w.balance),
+            walletType: w.walletType,
+            color: colors[Math.floor(Math.random() * colors.length)],
+            icon: icons[Math.floor(Math.random() * icons.length)],
+          })),
+        );
+      }
+    } catch (err) {
+      console.error("Error fetching wallets:", err);
+    }
+  };
+
+  const fetchCategories = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/data/categories`);
+      const data = await res.json();
+      if (data.categories) {
+        setCategoryItems(
+          data.categories.map((c: any) => ({
+            id: c.id.toString(),
+            value: c.value,
+          })),
+        );
+      }
+    } catch (err) {
+      console.error("Error fetching categories:", err);
+    }
+  };
+
+  const fetchTypes = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/data/type`);
+      const data = await res.json();
+      console.log(data);
+      if (data.types) {
+        setTypeItems(
+          data.types.map((t: any) => ({
+            id: t.id.toString(),
+            value: t.value,
+          })),
+        );
+      }
+    } catch (err) {
+      console.error("Error fetching types:", err);
+    }
+  };
+
+  useEffect(() => {
+    if (user) {
+      fetchWallets();
+      fetchCategories();
+      setLoading(false);
+      fetchTypes();
+    }
+  }, [user]);
+
+  const handleSave = async () => {
+    if (!amount || !category || !wallet || !selectedType) {
       Alert.alert("Missing Fields", "Please fill in all required fields.");
       return;
     }
@@ -125,19 +180,43 @@ export default function AddTransaction({
       return;
     }
 
-    const transaction: Transaction = {
-      category,
-      amount,
+    if (!user) return;
+
+    const body = {
+      userId: user.id,
+      walletId: wallet,
+      categoryId: category,
+      typeId: selectedType.id,
+      amount: Number(amount),
+      title,
       description,
-      date,
-      type: selectedType,
-      wallet,
-      title: ""
     };
 
-    onSave(transaction);
-    onClose();
+    try {
+      const res = await fetch(`${API_BASE}/transaction/add`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+      const data = await res.json();
+      if (data.status) {
+        Alert.alert("Success", "Transaction added successfully");
+        onSave();
+        loadWallet();
+        sendMessage(JSON.stringify({ type: "TRANSACTION_UPDATED" }));
+
+        onClose();
+      } else {
+        Alert.alert("Error", data.message || "Failed to add transaction");
+      }
+    } catch (err) {
+      console.error("Error saving transaction:", err);
+      Alert.alert("Error", "Server error");
+    }
   };
+
+  if (loading) return <Text>Loading...</Text>;
 
   return (
     <KeyboardAvoidingView
@@ -147,11 +226,9 @@ export default function AddTransaction({
     >
       <ScrollView
         contentContainerStyle={styles.scrollContainer}
-        showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.container}>
-          {/* Header */}
           <View style={styles.header}>
             <Text style={styles.title}>Add New Transaction</Text>
             <Pressable onPress={onClose} style={styles.closeIcon}>
@@ -159,47 +236,33 @@ export default function AddTransaction({
             </Pressable>
           </View>
 
-          {/* Type Selector */}
           <View style={styles.typeSelector}>
-            <Pressable
-              style={[
-                styles.typeButton,
-                selectedType === "expense" && styles.typeButtonActive,
-              ]}
-              onPress={() => setSelectedType("expense")}
-            >
-              <Text
+            {typeItems.map((t) => (
+              <Pressable
+                key={t.id}
                 style={[
-                  styles.typeButtonText,
-                  selectedType === "expense" && styles.typeButtonTextActive,
+                  styles.typeButton,
+                  selectedType?.id === t.id && styles.typeButtonActive,
                 ]}
+                onPress={() => setSelectedType(t)}
               >
-                Expense
-              </Text>
-            </Pressable>
-            <Pressable
-              style={[
-                styles.typeButton,
-                selectedType === "income" && styles.typeButtonActive,
-              ]}
-              onPress={() => setSelectedType("income")}
-            >
-              <Text
-                style={[
-                  styles.typeButtonText,
-                  selectedType === "income" && styles.typeButtonTextActive,
-                ]}
-              >
-                Income
-              </Text>
-            </Pressable>
+                <Text
+                  style={[
+                    styles.typeButtonText,
+                    selectedType?.id === t.id && styles.typeButtonTextActive,
+                  ]}
+                >
+                  {t.value}
+                </Text>
+              </Pressable>
+            ))}
           </View>
 
           <Text style={styles.label}>Category *</Text>
           <DropDownPicker
             open={categoryOpen}
             value={category}
-            items={categoryItems}
+            items={categoryItems.map((c) => ({ label: c.value, value: c.id }))}
             setOpen={setCategoryOpen}
             setValue={setCategory}
             setItems={setCategoryItems}
@@ -214,13 +277,17 @@ export default function AddTransaction({
             zIndexInverse={1000}
           />
 
-          <Text style={[styles.label, { marginTop: categoryOpen ? 180 : 16 }]}>
-            Select Wallet *
-          </Text>
+          <Text style={[styles.label, { marginTop: 16 }]}>Wallet *</Text>
           <DropDownPicker
             open={walletOpen}
             value={wallet}
-            items={walletItems}
+            items={walletItems.map((w) => ({
+              label: w.name,
+              value: w.id,
+              icon: () => (
+                <Ionicons name={w.icon as any} size={18} color={w.color} />
+              ),
+            }))}
             setOpen={setWalletOpen}
             setValue={setWallet}
             setItems={setWalletItems}
@@ -235,89 +302,62 @@ export default function AddTransaction({
             zIndexInverse={2000}
           />
 
-          <Text style={[styles.label, { marginTop: walletOpen ? 180 : 16 }]}>
-            Amount *
-          </Text>
+          <Text style={[styles.label, { marginTop: 16 }]}>Amount *</Text>
           <View style={styles.amountInputContainer}>
             <Text style={styles.currencySymbol}>$</Text>
             <TextInput
               style={styles.amountInput}
               placeholder="0.00"
-              placeholderTextColor="#6b7280"
               keyboardType="decimal-pad"
               value={amount}
               onChangeText={setAmount}
             />
           </View>
 
-          <Text style={[styles.label, { marginTop: walletOpen ? 180 : 16 }]}>Title</Text>
+          <Text style={[styles.label, { marginTop: 16 }]}>Title</Text>
           <TextInput
-            style={[styles.input]}
-            placeholder="Add notes (optional)"
-            placeholderTextColor="#6b7280"
+            style={styles.input}
+            placeholder="Title"
             value={title}
-            multiline={true}
-            numberOfLines={4}
             onChangeText={setTitle}
-            textAlignVertical="top"
           />
 
-         <Text style={[styles.label, { marginTop: walletOpen ? 180 : 16 }]}>Description</Text>
+          <Text style={[styles.label, { marginTop: 16 }]}>Description</Text>
           <TextInput
             style={[styles.input, styles.textArea]}
-            placeholder="Add notes (optional)"
-            placeholderTextColor="#6b7280"
+            placeholder="Description (optional)"
             value={description}
-            multiline={true}
+            multiline
             numberOfLines={4}
             onChangeText={setDescription}
-            textAlignVertical="top"
           />
 
-            <Text style={[styles.label, { marginTop: walletOpen ? 180 : 16 }]}>Date</Text>
+          <Text style={[styles.label, { marginTop: 16 }]}>Date</Text>
           <TouchableOpacity
             style={styles.dateButton}
             onPress={() => setShowDatePicker(true)}
           >
-            <Text style={styles.dateText}>
-              {date.toLocaleDateString("en-US", {
-                weekday: "short",
-                year: "numeric",
-                month: "short",
-                day: "numeric",
-              })}
-            </Text>
+            <Text style={styles.dateText}>{date.toLocaleDateString()}</Text>
             <Ionicons name="calendar-outline" size={20} color="#a3e535" />
           </TouchableOpacity>
-
           {showDatePicker && (
             <DateTimePicker
               value={date}
               mode="date"
               display={Platform.OS === "ios" ? "spinner" : "default"}
-              onChange={(event, selectedDate) => {
+              onChange={(e, d) => {
                 setShowDatePicker(Platform.OS === "ios");
-                if (selectedDate) setDate(selectedDate);
+                if (d) setDate(d);
               }}
               maximumDate={new Date()}
             />
           )}
 
-          {/* Action Buttons */}
           <View style={styles.buttonContainer}>
-            <TouchableOpacity
-              style={styles.saveButton}
-              onPress={handleSave}
-              activeOpacity={0.8}
-            >
+            <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
               <Text style={styles.saveButtonText}>Save Transaction</Text>
             </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.cancelButton}
-              onPress={onClose}
-              activeOpacity={0.8}
-            >
+            <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
               <Text style={styles.cancelButtonText}>Cancel</Text>
             </TouchableOpacity>
           </View>

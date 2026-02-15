@@ -1,7 +1,13 @@
+import {
+  closeConnection,
+  connectWebSocket,
+  sendMessage,
+} from "@/service/socketServices";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { LinearGradient } from "expo-linear-gradient";
-import React, { useEffect, useState } from "react";
+import { useFocusEffect } from "expo-router";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -66,12 +72,35 @@ export default function Wallet() {
     fetchUser();
   }, []);
 
+  useFocusEffect(
+    useCallback(() => {
+      if (!user) return;
+      connectWebSocket((message: string) => {
+        console.log("WebSocket message received:", message);
+
+        let data;
+        try {
+          data = JSON.parse(message);
+        } catch {
+          data = { type: message };
+        }
+
+        if (data.type === "WALLET_UPDATED") fetchWallets();
+      });
+      fetchWallets();
+
+      return () => {
+        closeConnection();
+      };
+    }, [user]),
+  );
+
   const WALLET_API =
     Platform.OS === "android"
       ? "http://10.0.2.2:8080/backend/api/wallet/public"
       : "http://192.168.8.115:8080/backend/api/wallet/public";
 
-       const WALLET_API2 =
+  const WALLET_API2 =
     Platform.OS === "android"
       ? "http://10.0.2.2:8080/backend/api/wallet"
       : "http://192.168.8.115:8080/backend/api/wallet";
@@ -173,6 +202,7 @@ export default function Wallet() {
       }
 
       if (json.status === true || json.success === true) {
+        sendMessage(JSON.stringify({ type: "WALLET_UPDATED" }));
         Alert.alert("Success", "Wallet added successfully!");
         setWalletName("");
         setWalletBalance("");

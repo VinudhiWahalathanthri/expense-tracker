@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -13,317 +13,112 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-
-type User = {
-  name: string;
-  email: string;
-  phone: string;
-  currency: string;
-  theme: string;
-};
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { router } from "expo-router";
 
 export default function Profile() {
-  const [user, setUser] = useState<User>({
-    name: "John Doe",
-    email: "john.doe@example.com",
-    phone: "+1 (555) 123-4567",
-    currency: "USD",
-    theme: "Dark",
-  });
+  const [user, setUser] = useState<{
+    firstName: string;
+    lastName: string;
+    email: string;
+  } | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [editField, setEditField] = useState<keyof User | null>(null);
-  const [editValue, setEditValue] = useState("");
-
-  const handleEditPress = (field: keyof User) => {
-    setEditField(field);
-    setEditValue(user[field]);
-    setShowEditModal(true);
-  };
-
-  const handleSaveEdit = () => {
-    if (!editValue.trim()) {
-      Alert.alert("Error", "Field cannot be empty");
-      return;
-    }
-
-    if (editField) {
-      setUser({ ...user, [editField]: editValue });
-      setShowEditModal(false);
-      Alert.alert("Success", "Profile updated successfully!");
+  const handleLogout = async () => {
+    try {
+      await AsyncStorage.removeItem("user");
+      Alert.alert("Logged out", "You have been logged out successfully!");
+      router.replace("/(auth)");
+    } catch (err) {
+      console.error("Error logging out:", err);
+      Alert.alert("Error", "Something went wrong. Try again.");
     }
   };
 
-  const handleLogout = () => {
-    Alert.alert("Logout", "Are you sure you want to logout?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Logout",
-        style: "destructive",
-        onPress: () => {
-          Alert.alert("Logged out", "You have been logged out successfully");
-        },
-      },
-    ]);
-  };
-
-  const getFieldLabel = (field: keyof User) => {
-    const labels = {
-      name: "Name",
-      email: "Email",
-      phone: "Phone Number",
-      currency: "Currency",
-      theme: "Theme",
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const userData = await AsyncStorage.getItem("user");
+        if (userData) {
+          setUser(JSON.parse(userData));
+        }
+      } catch (err) {
+        console.error("Error fetching user:", err);
+      } finally {
+        setLoading(false);
+      }
     };
-    return labels[field];
-  };
+
+    fetchUser();
+  }, []);
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Header */}
         <View style={styles.header}>
           <Text style={styles.title}>Profile</Text>
         </View>
-
-        {/* Profile Card */}
         <View style={styles.profileCard}>
-          {/* Avatar */}
           <View style={styles.avatarContainer}>
             <View style={styles.avatar}>
               <Text style={styles.avatarText}>
-                {user.name
-                  .split(" ")
-                  .map((n) => n[0])
-                  .join("")
-                  .toUpperCase()}
+                {user?.firstName &&
+                  user?.lastName
+                    .split(" ")
+                    .map((n) => n[0])
+                    .join("")
+                    .toUpperCase()}
               </Text>
             </View>
             <TouchableOpacity style={styles.editAvatarButton}>
               <Ionicons name="camera" size={16} color="#000" />
             </TouchableOpacity>
           </View>
-
-          {/* User Info */}
-          <Text style={styles.userName}>{user.name}</Text>
-          <Text style={styles.userEmail}>{user.email}</Text>
+          <Text style={styles.userName}>{user?.firstName}</Text>
+          <Text style={styles.userEmail}>{user?.email}</Text>
         </View>
-
-        {/* Personal Information Section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Personal Information</Text>
 
           <View style={styles.settingsGroup}>
-            <TouchableOpacity
-              style={styles.settingItem}
-              onPress={() => handleEditPress("name")}
-            >
+            <TouchableOpacity style={styles.settingItem}>
               <View style={styles.settingLeft}>
-                <View style={[styles.iconWrapper, { backgroundColor: "#3b82f6" }]}>
+                <View
+                  style={[styles.iconWrapper, { backgroundColor: "#3b82f6" }]}
+                >
                   <Ionicons name="person" size={20} color="#fff" />
                 </View>
                 <View style={styles.settingText}>
                   <Text style={styles.settingLabel}>Name</Text>
-                  <Text style={styles.settingValue}>{user.name}</Text>
+                  <Text style={styles.settingValue}>
+                    {user?.firstName} {user?.lastName}
+                  </Text>
                 </View>
               </View>
               <Ionicons name="chevron-forward" size={20} color="#6b7280" />
             </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.settingItem}
-              onPress={() => handleEditPress("email")}
-            >
+            <TouchableOpacity style={styles.settingItem}>
               <View style={styles.settingLeft}>
-                <View style={[styles.iconWrapper, { backgroundColor: "#10b981" }]}>
+                <View
+                  style={[styles.iconWrapper, { backgroundColor: "#10b981" }]}
+                >
                   <Ionicons name="mail" size={20} color="#fff" />
                 </View>
                 <View style={styles.settingText}>
                   <Text style={styles.settingLabel}>Email</Text>
-                  <Text style={styles.settingValue}>{user.email}</Text>
-                </View>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color="#6b7280" />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.settingItem}
-              onPress={() => handleEditPress("phone")}
-            >
-              <View style={styles.settingLeft}>
-                <View style={[styles.iconWrapper, { backgroundColor: "#f59e0b" }]}>
-                  <Ionicons name="call" size={20} color="#fff" />
-                </View>
-                <View style={styles.settingText}>
-                  <Text style={styles.settingLabel}>Phone</Text>
-                  <Text style={styles.settingValue}>{user.phone}</Text>
+                  <Text style={styles.settingValue}>{user?.email}</Text>
                 </View>
               </View>
               <Ionicons name="chevron-forward" size={20} color="#6b7280" />
             </TouchableOpacity>
           </View>
         </View>
-
-        {/* Preferences Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Preferences</Text>
-
-          <View style={styles.settingsGroup}>
-            <TouchableOpacity
-              style={styles.settingItem}
-              onPress={() => handleEditPress("currency")}
-            >
-              <View style={styles.settingLeft}>
-                <View style={[styles.iconWrapper, { backgroundColor: "#8b5cf6" }]}>
-                  <Ionicons name="cash" size={20} color="#fff" />
-                </View>
-                <View style={styles.settingText}>
-                  <Text style={styles.settingLabel}>Currency</Text>
-                  <Text style={styles.settingValue}>{user.currency}</Text>
-                </View>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color="#6b7280" />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.settingItem}
-              onPress={() => handleEditPress("theme")}
-            >
-              <View style={styles.settingLeft}>
-                <View style={[styles.iconWrapper, { backgroundColor: "#ec4899" }]}>
-                  <Ionicons name="moon" size={20} color="#fff" />
-                </View>
-                <View style={styles.settingText}>
-                  <Text style={styles.settingLabel}>Theme</Text>
-                  <Text style={styles.settingValue}>{user.theme}</Text>
-                </View>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color="#6b7280" />
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.settingItem}>
-              <View style={styles.settingLeft}>
-                <View style={[styles.iconWrapper, { backgroundColor: "#ef4444" }]}>
-                  <Ionicons name="notifications" size={20} color="#fff" />
-                </View>
-                <View style={styles.settingText}>
-                  <Text style={styles.settingLabel}>Notifications</Text>
-                  <Text style={styles.settingValue}>Enabled</Text>
-                </View>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color="#6b7280" />
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Other Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Other</Text>
-
-          <View style={styles.settingsGroup}>
-            <TouchableOpacity style={styles.settingItem}>
-              <View style={styles.settingLeft}>
-                <View style={[styles.iconWrapper, { backgroundColor: "#06b6d4" }]}>
-                  <Ionicons name="help-circle" size={20} color="#fff" />
-                </View>
-                <Text style={styles.settingLabelOnly}>Help & Support</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color="#6b7280" />
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.settingItem}>
-              <View style={styles.settingLeft}>
-                <View style={[styles.iconWrapper, { backgroundColor: "#6366f1" }]}>
-                  <Ionicons name="shield-checkmark" size={20} color="#fff" />
-                </View>
-                <Text style={styles.settingLabelOnly}>Privacy Policy</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color="#6b7280" />
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.settingItem}>
-              <View style={styles.settingLeft}>
-                <View style={[styles.iconWrapper, { backgroundColor: "#14b8a6" }]}>
-                  <Ionicons name="document-text" size={20} color="#fff" />
-                </View>
-                <Text style={styles.settingLabelOnly}>Terms & Conditions</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color="#6b7280" />
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.settingItem}>
-              <View style={styles.settingLeft}>
-                <View style={[styles.iconWrapper, { backgroundColor: "#84cc16" }]}>
-                  <Ionicons name="information-circle" size={20} color="#fff" />
-                </View>
-                <Text style={styles.settingLabelOnly}>About</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color="#6b7280" />
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Logout Button */}
         <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
           <Ionicons name="log-out-outline" size={20} color="#ef4444" />
           <Text style={styles.logoutButtonText}>Logout</Text>
         </TouchableOpacity>
-
-        {/* Version */}
-        <Text style={styles.versionText}>Version 1.0.0</Text>
       </ScrollView>
-
-      {/* Edit Modal */}
-      <Modal
-        visible={showEditModal}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowEditModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>
-                Edit {editField && getFieldLabel(editField)}
-              </Text>
-              <Pressable onPress={() => setShowEditModal(false)}>
-                <Ionicons name="close" size={24} color="#fff" />
-              </Pressable>
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>
-                {editField && getFieldLabel(editField)}
-              </Text>
-              <TextInput
-                style={styles.input}
-                placeholder={`Enter ${editField && getFieldLabel(editField).toLowerCase()}`}
-                placeholderTextColor="#6b7280"
-                value={editValue}
-                onChangeText={setEditValue}
-                keyboardType={editField === "email" ? "email-address" : "default"}
-                autoCapitalize={editField === "email" ? "none" : "words"}
-              />
-            </View>
-
-            <View style={styles.modalActions}>
-              <Pressable
-                style={[styles.modalButton, styles.cancelButton]}
-                onPress={() => setShowEditModal(false)}
-              >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </Pressable>
-
-              <Pressable
-                style={[styles.modalButton, styles.saveButton]}
-                onPress={handleSaveEdit}
-              >
-                <Text style={styles.saveButtonText}>Save</Text>
-              </Pressable>
-            </View>
-          </View>
-        </View>
-      </Modal>
     </SafeAreaView>
   );
 }
